@@ -1,0 +1,72 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# Kiro specs and configuration
+.kiro/
+
+# Build artifacts
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test files
+*_test.go
+testdata/
+
+# Documentation (except examples)
+*.md
+!examples/*.md
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment files
+.env
+.env.*
+*.local
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Logs
+*.log
+
+# Coverage reports
+*.out
+coverage.txt
+coverage.html
+
+# Dependencies (will be downloaded during build)
+vendor/
+
+# Docker files (not needed in image)
+Dockerfile*
+docker-compose*.yaml
+docker-compose*.yml
+.dockerignore
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# License and contribution files
+LICENSE
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+
+# Example configuration with real credentials
+config.yaml
+!examples/config.yaml

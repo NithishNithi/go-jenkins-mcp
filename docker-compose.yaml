@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # Jenkins MCP Server
+  jenkins-mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jenkins-mcp-server
+    
+    # Environment variables for Jenkins connection
+    environment:
+      # Required: Jenkins instance URL
+      JENKINS_URL: ${JENKINS_URL:-https://jenkins.example.com}
+      
+      # Authentication: Use either API token or username/password
+      JENKINS_API_TOKEN: ${JENKINS_API_TOKEN:-}
+      # JENKINS_USERNAME: ${JENKINS_USERNAME:-}
+      # JENKINS_PASSWORD: ${JENKINS_PASSWORD:-}
+      
+      # Optional: Timeout configuration
+      JENKINS_TIMEOUT: ${JENKINS_TIMEOUT:-30s}
+      
+      # Optional: TLS configuration
+      JENKINS_TLS_SKIP_VERIFY: ${JENKINS_TLS_SKIP_VERIFY:-false}
+      JENKINS_CA_CERT: ${JENKINS_CA_CERT:-}
+      
+      # Optional: Retry configuration
+      JENKINS_MAX_RETRIES: ${JENKINS_MAX_RETRIES:-3}
+      JENKINS_RETRY_BACKOFF: ${JENKINS_RETRY_BACKOFF:-1s}
+    
+    # Mount volumes for configuration and CA certificates
+    volumes:
+      # Optional: Mount config file
+      - ./examples/config.yaml:/app/config.yaml:ro
+      
+      # Optional: Mount custom CA certificate
+      # - ./certs/ca.crt:/app/ca.crt:ro
+    
+    # Stdin and TTY for MCP stdio communication
+    stdin_open: true
+    tty: true
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Resource limits (adjust as needed)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Network mode (default bridge is fine for most cases)
+    # network_mode: bridge
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Read-only root filesystem for security
+    # Uncomment if you don't need to write to the container filesystem
+    # read_only: true
+
+# Optional: Define custom network
+# networks:
+#   mcp-network:
+#     driver: bridge
+
+# Optional: Define volumes for persistent data
+# volumes:
+#   config-data:
+#     driver: local
