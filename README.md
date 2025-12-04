@@ -6,7 +6,7 @@ A Model Context Protocol (MCP) server implementation in Go that provides program
 
 - **Complete Jenkins API Coverage**: List jobs, get job details, trigger builds, monitor status, retrieve logs and artifacts
 - **MCP Protocol Compliant**: Full implementation of the Model Context Protocol specification
-- **Flexible Authentication**: Support for both username/password and API token authentication
+- **Secure Authentication**: Username and API token authentication
 - **Secure Connections**: TLS/SSL support with custom CA certificate configuration
 - **Robust Error Handling**: Automatic retry with exponential backoff for transient failures
 - **Configurable**: Environment variables or configuration file support
@@ -39,10 +39,10 @@ git clone https://github.com/NithishNithi/go-jenkins-mcp.git
 cd go-jenkins-mcp
 
 # Build the binary
-go build -o bin/jenkins-mcp-server ./cmd/jenkins-mcp-server
+go build -o jenkins-mcp-server .
 
 # Optionally, move to your PATH
-sudo mv bin/jenkins-mcp-server /usr/local/bin/
+sudo mv jenkins-mcp-server /usr/local/bin/
 ```
 
 ### Option 3: Download Pre-built Binary
@@ -53,7 +53,7 @@ Download the latest release from the [releases page](https://github.com/NithishN
 
 - Go 1.23.6 or later (for building from source)
 - Access to a Jenkins instance
-- Jenkins API token or username/password credentials
+- Jenkins username and API token
 
 ## Configuration
 
@@ -64,11 +64,8 @@ The Jenkins MCP Server can be configured using environment variables or a config
 ```bash
 # Required
 JENKINS_URL=https://jenkins.example.com
+JENKINS_USERNAME=your-username
 JENKINS_API_TOKEN=your-api-token-here
-
-# OR use username/password
-JENKINS_USERNAME=admin
-JENKINS_PASSWORD=your-password
 
 # Optional
 JENKINS_TIMEOUT=30s                    # Request timeout (default: 30s)
@@ -85,12 +82,8 @@ Create a `config.yaml` file:
 ```yaml
 jenkins:
   url: https://jenkins.example.com
-  
-  # Authentication - use either API token or username/password
+  username: your-username
   apiToken: your-api-token-here
-  # OR
-  # username: admin
-  # password: your-password
   
   # Optional settings
   timeout: 30s
@@ -110,17 +103,16 @@ Specify the config file when running:
 jenkins-mcp-server --config /path/to/config.yaml
 ```
 
-### Authentication Methods
+### Authentication
 
-**API Token (Recommended):**
+The server requires both username and API token for authentication:
+
 1. Log in to Jenkins
 2. Click your name in the top right
 3. Click "Configure"
 4. Under "API Token", click "Add new Token"
 5. Copy the generated token and use it as `JENKINS_API_TOKEN`
-
-**Username/Password:**
-Use your Jenkins username and password. Note that this method is less secure than API tokens.
+6. Use your Jenkins username as `JENKINS_USERNAME`
 
 ## Usage
 
@@ -131,6 +123,7 @@ The server communicates via stdio (standard input/output) as per the MCP specifi
 ```bash
 # Using environment variables
 export JENKINS_URL=https://jenkins.example.com
+export JENKINS_USERNAME=your-username
 export JENKINS_API_TOKEN=your-token
 jenkins-mcp-server
 
@@ -144,175 +137,55 @@ You can test the server by sending MCP protocol messages via stdin. However, it'
 
 ## Available Tools
 
-The Jenkins MCP Server exposes the following tools:
+The Jenkins MCP Server exposes the following tools organized by category:
 
-### 1. jenkins_list_jobs
+### Jobs
 
-List all accessible Jenkins jobs.
+**jenkins_list_jobs** - List all accessible Jenkins jobs. Optionally filter by folder path.
 
-**Parameters:**
-- `folder` (optional, string): Folder path to list jobs from
+**jenkins_get_job** - Get detailed information about a specific Jenkins job including configuration, parameters, and recent build history.
 
-**Example:**
-```json
-{
-  "name": "jenkins_list_jobs",
-  "arguments": {
-    "folder": "my-folder"
-  }
-}
-```
+**jenkins_trigger_build** - Trigger a new build for a Jenkins job. Supports parameterized builds.
 
-### 2. jenkins_get_job
+### Builds
 
-Get detailed information about a specific job.
+**jenkins_get_build** - Get status and details of a specific build. If buildNumber is omitted, returns the latest build.
 
-**Parameters:**
-- `jobName` (required, string): Name of the job
+**jenkins_get_build_log** - Retrieve the console output (log) for a specific build. Supports optional size limits for large logs.
 
-**Example:**
-```json
-{
-  "name": "jenkins_get_job",
-  "arguments": {
-    "jobName": "my-build-job"
-  }
-}
-```
+**jenkins_get_running_builds** - Get all currently running builds across all Jenkins jobs.
 
-### 3. jenkins_trigger_build
+**jenkins_stop_build** - Stop a running build. The build status will be updated to ABORTED.
 
-Trigger a new build for a job.
+### Artifacts
 
-**Parameters:**
-- `jobName` (required, string): Name of the job to build
-- `parameters` (optional, object): Build parameters as key-value pairs
+**jenkins_list_artifacts** - List all artifacts produced by a specific build.
 
-**Example:**
-```json
-{
-  "name": "jenkins_trigger_build",
-  "arguments": {
-    "jobName": "my-build-job",
-    "parameters": {
-      "BRANCH": "main",
-      "ENVIRONMENT": "production"
-    }
-  }
-}
-```
+**jenkins_get_artifact** - Download a specific artifact from a build. Returns the artifact content.
 
-### 4. jenkins_get_build
+### Queue
 
-Get information about a specific build.
+**jenkins_get_queue** - Get the current Jenkins build queue showing all pending builds.
 
-**Parameters:**
-- `jobName` (required, string): Name of the job
-- `buildNumber` (optional, integer): Build number (omit for latest build)
+**jenkins_get_queue_item** - Get details about a specific queue item by ID.
 
-**Example:**
-```json
-{
-  "name": "jenkins_get_build",
-  "arguments": {
-    "jobName": "my-build-job",
-    "buildNumber": 42
-  }
-}
-```
+**jenkins_cancel_queue_item** - Cancel a queued build before it starts.
 
-### 5. jenkins_get_build_log
+### Views
 
-Retrieve console output for a build.
+**jenkins_list_views** - List all Jenkins views.
 
-**Parameters:**
-- `jobName` (required, string): Name of the job
-- `buildNumber` (required, integer): Build number
-- `sizeLimit` (optional, integer): Maximum log size in bytes
+**jenkins_get_view** - Get jobs in a specific Jenkins view.
 
-**Example:**
-```json
-{
-  "name": "jenkins_get_build_log",
-  "arguments": {
-    "jobName": "my-build-job",
-    "buildNumber": 42
-  }
-}
-```
+**jenkins_create_view** - Create a new Jenkins view.
 
-### 6. jenkins_list_artifacts
+### Server & Nodes
 
-List all artifacts for a build.
+**jenkins_server_health** - Get the health status of the Jenkins server.
 
-**Parameters:**
-- `jobName` (required, string): Name of the job
-- `buildNumber` (required, integer): Build number
+**jenkins_list_nodes** - List all Jenkins nodes in the network.
 
-**Example:**
-```json
-{
-  "name": "jenkins_list_artifacts",
-  "arguments": {
-    "jobName": "my-build-job",
-    "buildNumber": 42
-  }
-}
-```
-
-### 7. jenkins_get_artifact
-
-Download a specific artifact.
-
-**Parameters:**
-- `jobName` (required, string): Name of the job
-- `buildNumber` (required, integer): Build number
-- `artifactPath` (required, string): Relative path to the artifact
-
-**Example:**
-```json
-{
-  "name": "jenkins_get_artifact",
-  "arguments": {
-    "jobName": "my-build-job",
-    "buildNumber": 42,
-    "artifactPath": "target/app.jar"
-  }
-}
-```
-
-### 8. jenkins_get_queue
-
-Get the current build queue.
-
-**Parameters:** None
-
-**Example:**
-```json
-{
-  "name": "jenkins_get_queue",
-  "arguments": {}
-}
-```
-
-### 9. jenkins_stop_build
-
-Stop a running build.
-
-**Parameters:**
-- `jobName` (required, string): Name of the job
-- `buildNumber` (required, integer): Build number
-
-**Example:**
-```json
-{
-  "name": "jenkins_stop_build",
-  "arguments": {
-    "jobName": "my-build-job",
-    "buildNumber": 42
-  }
-}
-```
+**jenkins_get_pipeline_script** - Retrieve the Jenkinsfile (pipeline script) of a pipeline job.
 
 ## MCP Client Integration
 
@@ -328,11 +201,14 @@ Add the Jenkins MCP Server to your Claude Desktop configuration:
 {
   "mcpServers": {
     "jenkins": {
-      "command": "/usr/local/bin/jenkins-mcp-server",
-      "env": {
-        "JENKINS_URL": "https://jenkins.example.com",
-        "JENKINS_API_TOKEN": "your-token-here"
-      }
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "JENKINS_URL=https://jenkins.example.com",
+        "-e", "JENKINS_USERNAME=your-username",
+        "-e", "JENKINS_API_TOKEN=your-api-token",
+        "ghcr.io/nithishnithi/jenkins-mcp-server:v1.0.1"
+      ]
     }
   }
 }
@@ -370,7 +246,7 @@ Any MCP-compliant client can use this server. Configure the client to:
 
 **Solutions:**
 - Verify API token is valid and not expired
-- Ensure username/password are correct
+- Ensure username is correct
 - Check that the user has necessary permissions
 - Regenerate API token if needed
 
@@ -415,14 +291,16 @@ Any MCP-compliant client can use this server. Configure the client to:
 
 ### Debugging
 
-Enable verbose logging by setting the log level:
+The server uses structured JSON logging with timestamps for better observability.
+
+**Enable verbose logging:**
 
 ```bash
 export LOG_LEVEL=debug
 jenkins-mcp-server
 ```
 
-Check the logs for detailed error messages and request/response information.
+
 
 ## Development
 
@@ -430,35 +308,23 @@ Check the logs for detailed error messages and request/response information.
 
 ```
 .
-├── cmd/
-│   └── jenkins-mcp-server/    # Main application entry point
 ├── internal/
 │   ├── config/                # Configuration management
 │   ├── jenkins/               # Jenkins API client
 │   └── mcp/                   # MCP server implementation
-├── examples/                  # Example configuration files
-├── bin/                       # Compiled binaries
+├── main.go                    # Main application entry point
 ├── go.mod                     # Go module definition
-└── go.sum                     # Go module checksums
+├── go.sum                     # Go module checksums
+├── README.md                  # Main documentation
+├── QUICKSTART.md              # Quick start guide
+├── DOCUMENTATION.md           # Documentation index
+└── Dockerfile                 # Docker image definition
 ```
 
 ### Building
 
 ```bash
-go build -o bin/jenkins-mcp-server ./cmd/jenkins-mcp-server
-```
-
-### Running Tests
-
-```bash
-# Run all tests
-go test ./...
-
-# Run tests with coverage
-go test -cover ./...
-
-# Run property-based tests
-go test -v ./internal/...
+go build -o jenkins-mcp-server .
 ```
 
 ### Contributing

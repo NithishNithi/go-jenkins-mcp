@@ -10,6 +10,7 @@ import (
 
 	"github.com/NithishNithi/go-jenkins-mcp/internal/jenkins"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/sirupsen/logrus"
 )
 
 // ServerHealthArgs defines the input parameters for jenkins_server_health
@@ -24,11 +25,27 @@ type ListJobsArgs struct {
 
 // handleListJobs handles the jenkins_list_jobs tool call
 func (s *Server) handleListJobs(ctx context.Context, request *mcp.CallToolRequest, args ListJobsArgs) (*mcp.CallToolResult, any, error) {
+	s.log.WithFields(logrus.Fields{
+		"tool":   "jenkins_list_jobs",
+		"folder": args.Folder,
+	}).Debug("Handling list jobs request")
+
 	// Call Jenkins client
 	jobs, err := s.jenkinsClient.ListJobs(ctx, args.Folder)
 	if err != nil {
+		s.log.WithFields(logrus.Fields{
+			"tool":   "jenkins_list_jobs",
+			"folder": args.Folder,
+			"error":  err.Error(),
+		}).Error("Failed to list jobs")
 		return nil, nil, fmt.Errorf("failed to list jobs: %w", err)
 	}
+
+	s.log.WithFields(logrus.Fields{
+		"tool":      "jenkins_list_jobs",
+		"folder":    args.Folder,
+		"job_count": len(jobs),
+	}).Info("Successfully listed jobs")
 
 	// Convert to JSON for response
 	result, err := json.MarshalIndent(jobs, "", "  ")
@@ -160,10 +177,27 @@ Please ask the user to provide values for these missing parameters.`,
 	}
 
 	// All validations passed - trigger the build
+	s.log.WithFields(logrus.Fields{
+		"tool":       "jenkins_trigger_build",
+		"job":        args.JobName,
+		"parameters": args.Parameters,
+	}).Info("Triggering Jenkins build")
+
 	queueItem, err := s.jenkinsClient.TriggerBuild(ctx, args.JobName, args.Parameters)
 	if err != nil {
+		s.log.WithFields(logrus.Fields{
+			"tool":  "jenkins_trigger_build",
+			"job":   args.JobName,
+			"error": err.Error(),
+		}).Error("Failed to trigger build")
 		return nil, nil, fmt.Errorf("failed to trigger build: %w", err)
 	}
+
+	s.log.WithFields(logrus.Fields{
+		"tool":     "jenkins_trigger_build",
+		"job":      args.JobName,
+		"queue_id": queueItem.ID,
+	}).Info("Build triggered successfully")
 
 	// Convert to JSON for response
 	result, err := json.MarshalIndent(queueItem, "", "  ")
@@ -562,6 +596,51 @@ func (s *Server) handleCreateView(ctx context.Context, request *mcp.CallToolRequ
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: successMsg},
+		},
+	}, nil, nil
+}
+
+type GetNodes struct{}
+
+// handleGetNodes handles the jenkins_get_nodes tool call
+func (s *Server) handleGetNodes(ctx context.Context, request *mcp.CallToolRequest, args GetNodes) (*mcp.CallToolResult, any, error) {
+	// Call Jenkins client
+	nodes, err := s.jenkinsClient.GetNodes(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get nodes: %w", err)
+	}
+
+	// Convert to JSON for response
+	result, err := json.MarshalIndent(nodes, "", "  ")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal response: %w", err)
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: string(result)},
+		},
+	}, nil, nil
+}
+
+type GetPipelineScriptArgs struct {
+	Job string `json:"job"`
+}
+
+func (s *Server) handleGetPipelineScript(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	args GetPipelineScriptArgs,
+) (*mcp.CallToolResult, any, error) {
+
+	script, err := s.jenkinsClient.GetPipelineScript(ctx, args.Job)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get pipeline script: %w", err)
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: script},
 		},
 	}, nil, nil
 }

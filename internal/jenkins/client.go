@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/NithishNithi/go-jenkins-mcp/internal/config"
@@ -47,6 +49,8 @@ type JenkinsClient interface {
 	ListViews(ctx context.Context) ([]View, error)
 	GetView(ctx context.Context, viewName string) (*ViewDetails, error)
 	CreateView(ctx context.Context, viewName string, viewType string) error
+	GetNodes(ctx context.Context) ([]Node, error)
+	GetPipelineScript(ctx context.Context, jobName string) (string, error)
 }
 
 // Client represents a Jenkins API client implementation
@@ -459,25 +463,15 @@ func (c *Client) TriggerBuild(ctx context.Context, jobName string, params map[st
 	var body io.Reader
 
 	if len(params) > 0 {
-		// Use buildWithParameters endpoint
+		// Use buildWithParameters endpoint with query parameters
 		path = fmt.Sprintf("/job/%s/buildWithParameters", jobName)
 
-		// Encode parameters as JSON in request body
-		paramJSON := make(map[string]interface{})
-		paramJSON["parameter"] = make([]map[string]string, 0, len(params))
-
+		// Jenkins expects parameters as query parameters in the URL
+		queryParams := url.Values{}
 		for name, value := range params {
-			paramJSON["parameter"] = append(paramJSON["parameter"].([]map[string]string), map[string]string{
-				"name":  name,
-				"value": value,
-			})
+			queryParams.Add(name, value)
 		}
-
-		jsonData, err := json.Marshal(paramJSON)
-		if err != nil {
-			return nil, fmt.Errorf("failed to encode parameters: %w", err)
-		}
-		body = bytes.NewReader(jsonData)
+		path = path + "?" + queryParams.Encode()
 	} else {
 		// Use simple build endpoint
 		path = fmt.Sprintf("/job/%s/build", jobName)
@@ -1274,4 +1268,102 @@ func (c *Client) CreateView(ctx context.Context, viewName string, viewType strin
 	}
 
 	return nil
+}
+
+type Node struct {
+	DisplayName        string `json:"displayName"`
+	Offline            bool   `json:"offline"`
+	TemporarilyOffline bool   `json:"temporarilyOffline"`
+	NumExecutors       int    `json:"numExecutors"`
+}
+
+// GetNodes retrieves all Jenkins nodes
+func (c *Client) GetNodes(ctx context.Context) ([]Node, error) {
+	// Build API path (customize fields as needed)
+	path := "/computer/api/json?tree=computer[displayName,offline,temporarilyOffline,numExecutors]"
+
+	// Make GET request
+	resp, err := c.doRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get nodes: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Handle HTTP errors
+	if resp.StatusCode == http.StatusForbidden {
+		return nil, fmt.Errorf("permission denied: insufficient permissions to get nodes")
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var result struct {
+		Computer []Node `json:"computer"`
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	// Return empty list if no nodes (not an error)
+	if result.Computer == nil {
+		return []Node{}, nil
+	}
+
+	return result.Computer, nil
+}
+func (c *Client) GetPipelineScript(ctx context.Context, job string) (string, error) {
+	path := fmt.Sprintf("/job/%s/config.xml", job)
+
+	resp, err := c.doRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch config.xml: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return "", fmt.Errorf("job not found: %s", job)
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+
+	configBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read config.xml: %w", err)
+	}
+
+	xml := string(configBytes)
+
+	// ────────────────────────────────────────────────
+	// Case 1: Inline Pipeline script (CpsFlowDefinition)
+	// ────────────────────────────────────────────────
+	if strings.Contains(xml, "org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition") {
+		re := regexp.MustCompile(`<script>([\s\S]*?)</script>`)
+		match := re.FindStringSubmatch(xml)
+		if len(match) >= 2 {
+			return match[1], nil
+		}
+		return "", fmt.Errorf("pipeline job found, but <script> block is empty or missing")
+	}
+
+	// ────────────────────────────────────────────────
+	// Case 2: SCM Pipeline job (CpsScmFlowDefinition)
+	// ────────────────────────────────────────────────
+	if strings.Contains(xml, "org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition") {
+		return "", fmt.Errorf("pipeline is defined in SCM (Git). Jenkins does not store the Jenkinsfile inline")
+	}
+
+	// ────────────────────────────────────────────────
+	// Case 3: Multibranch / non-pipeline job
+	// ────────────────────────────────────────────────
+	return "", fmt.Errorf("job '%s' is not an inline pipeline job (no <script> block available)", job)
 }

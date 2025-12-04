@@ -49,14 +49,18 @@ func NewServer(cfg *config.Config, log *logrus.Logger) (*Server, error) {
 
 // Start starts the MCP server with stdio communication
 func (s *Server) Start(ctx context.Context) error {
-	s.log.Info("Starting Jenkins MCP Server")
+	s.log.WithFields(logrus.Fields{
+		"transport":   "stdio",
+		"jenkins_url": s.config.JenkinsURL,
+	}).Info("Starting Jenkins MCP Server")
 
 	// Start the server with stdio transport
 	if err := s.mcpServer.Run(ctx, &mcp.StdioTransport{}); err != nil {
+		s.log.WithError(err).Error("MCP server failed")
 		return fmt.Errorf("MCP server failed: %w", err)
 	}
 
-	s.log.Info("MCP Server stopped")
+	s.log.Info("MCP Server stopped gracefully")
 	return nil
 }
 
@@ -161,6 +165,19 @@ func (s *Server) registerTools() error {
 		Description: "Get the health status of the Jenkins server.",
 	}, s.handleServerHealthStatus)
 
-	s.log.Info("Registered 16 Jenkins tools")
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "jenkins_list_nodes",
+		Description: "List all Jenkins nodes in the network.",
+	}, s.handleGetNodes)
+
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "jenkins_get_pipeline_script",
+		Description: "Retrieve the Jenkinsfile (pipeline script) of a pipeline job.",
+	}, s.handleGetPipelineScript)
+
+	s.log.WithFields(logrus.Fields{
+		"tool_count": 20,
+		"categories": []string{"jobs", "builds", "artifacts", "queue", "views", "server"},
+	}).Info("Successfully registered all Jenkins tools")
 	return nil
 }

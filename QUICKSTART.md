@@ -21,9 +21,9 @@ Get the Jenkins MCP Server up and running in 5 minutes.
 ### Option A: Docker (Recommended)
 
 ```bash
-# Run with environment variables
 docker run -i \
   -e JENKINS_URL=https://your-jenkins.com \
+  -e JENKINS_USERNAME=your-username \
   -e JENKINS_API_TOKEN=your-token-here \
   ghcr.io/nithishnithi/jenkins-mcp-server:latest
 ```
@@ -38,6 +38,7 @@ cd go-jenkins-mcp
 # Create .env file
 cat > .env << EOF
 JENKINS_URL=https://your-jenkins.com
+JENKINS_USERNAME=your-username
 JENKINS_API_TOKEN=your-token-here
 EOF
 
@@ -48,20 +49,6 @@ docker-compose up -d
 docker-compose logs -f
 ```
 
-### Option C: Local Binary
-
-```bash
-# Install from source
-go install github.com/NithishNithi/go-jenkins-mcp/cmd/jenkins-mcp-server@latest
-
-# Set environment variables
-export JENKINS_URL=https://your-jenkins.com
-export JENKINS_API_TOKEN=your-token-here
-
-# Run the server
-jenkins-mcp-server
-```
-
 ## Step 3: Integrate with Claude Desktop
 
 1. **Find your Claude config file:**
@@ -69,23 +56,7 @@ jenkins-mcp-server
    - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
    - Linux: `~/.config/Claude/claude_desktop_config.json`
 
-2. **Add the Jenkins MCP Server:**
-
-```json
-{
-  "mcpServers": {
-    "jenkins": {
-      "command": "/usr/local/bin/jenkins-mcp-server",
-      "env": {
-        "JENKINS_URL": "https://your-jenkins.com",
-        "JENKINS_API_TOKEN": "your-token-here"
-      }
-    }
-  }
-}
-```
-
-Or with Docker:
+2. **Add the Jenkins MCP Server with Docker:**
 
 ```json
 {
@@ -94,8 +65,9 @@ Or with Docker:
       "command": "docker",
       "args": [
         "run", "-i", "--rm",
-        "-e", "JENKINS_URL=https://your-jenkins.com",
-        "-e", "JENKINS_API_TOKEN=your-token-here",
+        "-e", "JENKINS_URL=",
+        "-e", "JENKINS_USERNAME=",
+        "-e", "JENKINS_API_TOKEN=",
         "jenkins-mcp-server:latest"
       ]
     }
@@ -140,29 +112,47 @@ export JENKINS_TLS_SKIP_VERIFY=true
 ## Next Steps
 
 - **Full Documentation**: See [README.md](README.md)
-- **Configuration Options**: See [examples/CONFIGURATION.md](examples/CONFIGURATION.md)
-- **Docker Deployment**: See [examples/DOCKER_DEPLOYMENT.md](examples/DOCKER_DEPLOYMENT.md)
-- **Production Setup**: See [examples/DEPLOYMENT.md](examples/DEPLOYMENT.md)
+- **Complete Documentation Index**: See [DOCUMENTATION.md](DOCUMENTATION.md)
 
 ## Available Tools
 
 Once configured, you can use these Jenkins operations through Claude:
 
+**Jobs:**
 - `jenkins_list_jobs` - List all jobs
 - `jenkins_get_job` - Get job details
 - `jenkins_trigger_build` - Trigger a build
+
+**Builds:**
 - `jenkins_get_build` - Get build status
 - `jenkins_get_build_log` - Get build logs
+- `jenkins_get_running_builds` - Get all running builds
+- `jenkins_stop_build` - Stop a running build
+
+**Artifacts:**
 - `jenkins_list_artifacts` - List build artifacts
 - `jenkins_get_artifact` - Download artifacts
+
+**Queue:**
 - `jenkins_get_queue` - View build queue
-- `jenkins_stop_build` - Stop a running build
+- `jenkins_get_queue_item` - Get queue item details
+- `jenkins_cancel_queue_item` - Cancel queued build
+
+**Views:**
+- `jenkins_list_views` - List all views
+- `jenkins_get_view` - Get view details
+- `jenkins_create_view` - Create new view
+
+**Server & Nodes:**
+- `jenkins_server_health` - Check server health
+- `jenkins_list_nodes` - List all nodes
+- `jenkins_get_pipeline_script` - Get pipeline script
 
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/NithishNithi/go-jenkins-mcp/issues)
 - **Documentation**: [Full README](README.md)
-- **Examples**: [examples/](examples/)
+- **Documentation Index**: [DOCUMENTATION.md](DOCUMENTATION.md)
 
 ---
 
