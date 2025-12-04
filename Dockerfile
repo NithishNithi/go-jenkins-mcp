@@ -43,9 +43,6 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /build/jenkins-mcp-server /app/jenkins-mcp-server
 
-# Copy example configuration (optional)
-COPY --from=builder /build/examples/config.yaml /app/config.yaml.example
-
 # Change ownership to non-root user
 RUN chown -R mcp:mcp /app
 
