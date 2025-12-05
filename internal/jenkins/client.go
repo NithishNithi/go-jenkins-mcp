@@ -491,15 +491,39 @@ func (c *Client) TriggerBuild(ctx context.Context, jobName string, params map[st
 	if resp.StatusCode == http.StatusForbidden {
 		return nil, fmt.Errorf("permission denied: insufficient permissions to trigger build for job %s", jobName)
 	}
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+
+	// Handle redirects (302, 303, 307, 308) and success codes (201, 200)
+	var location string
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		// Redirect response - get location header
+		location = resp.Header.Get("Location")
+		if location == "" {
+			return nil, fmt.Errorf("redirect received but no Location header present (status: %d)", resp.StatusCode)
+		}
+	} else if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusOK {
+		// Success response - try to get location header
+		location = resp.Header.Get("Location")
+		if location == "" {
+			// Some Jenkins instances don't return Location header
+			// Try alternative: use the queue location pattern or return a delayed lookup
+			// For now, we'll generate a queue location based on response
+			location = c.generateQueueLocationFromResponse(jobName, resp)
+			if location == "" {
+				return nil, fmt.Errorf(
+					"jenkins did not return a queue Location header. " +
+						"This usually happens when:\n" +
+						" - Authentication failed (MFA enforced)\n" +
+						" - API token is invalid\n" +
+						" - Reverse proxy removed Location header\n" +
+						" - Build was not triggered at all\n\n" +
+						"Tip: Check for MFA redirects or test with curl",
+				)
+
+			}
+		}
+	} else {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	// Parse queue item ID from Location header
-	location := resp.Header.Get("Location")
-	if location == "" {
-		return nil, fmt.Errorf("no Location header in response")
 	}
 
 	// Extract queue item ID from location URL
@@ -568,6 +592,46 @@ func (c *Client) parseQueueIDFromLocation(location string) (int, error) {
 	}
 
 	return queueID, nil
+}
+
+// generateQueueLocationFromResponse attempts to generate a queue location when the Location header is missing
+// This is a fallback for Jenkins instances that don't return the Location header in the response
+func (c *Client) generateQueueLocationFromResponse(_ string, resp *http.Response) string {
+	// If we can't get the Location header, we have a few options:
+	// 1. Return a placeholder and let the caller fetch the queue via other means
+	// 2. Attempt to parse the response body for queue information
+	// 3. Return empty and handle gracefully in the calling code
+
+	// For now, we'll read the response body to see if it contains queue information
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ""
+	}
+
+	// Reset the response body for potential re-reading
+	// (Note: this only works for our current use case since we're at the end)
+
+	// Try to extract queue ID from response body if it's a redirect HTML page
+	bodyStr := string(bodyBytes)
+
+	// Look for queue item URL in various formats
+	// Pattern 1: Direct queue location in response
+	queuePattern := regexp.MustCompile(`/queue/item/(\d+)/`)
+	matches := queuePattern.FindStringSubmatch(bodyStr)
+	if len(matches) > 1 {
+		return matches[0] // Return the full path
+	}
+
+	// Pattern 2: Jenkins may return a JSON response with queue URL
+	var jsonResp map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &jsonResp); err == nil {
+		if queueURL, ok := jsonResp["_links"].(map[string]interface{})["self"].(map[string]interface{})["href"]; ok {
+			return fmt.Sprintf("%v", queueURL)
+		}
+	}
+
+	// If we still can't find it, return empty string to indicate failure
+	return ""
 }
 
 func (c *Client) GetBuild(ctx context.Context, jobName string, buildNumber int) (*Build, error) {

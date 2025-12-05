@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/NithishNithi/go-jenkins-mcp/internal/jenkins"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -119,7 +120,8 @@ func (s *Server) handleTriggerBuild(ctx context.Context, request *mcp.CallToolRe
 				paramList = append(paramList, fmt.Sprintf("  • %s (%s)%s%s", param.Name, param.Type, defaultVal, paramDesc))
 			}
 
-			warningMsg := fmt.Sprintf(`⚠️  PARAMETERS REQUIRED
+			warningMsg := fmt.Sprintf(
+				`⚠️ PARAMETERS REQUIRED
 
 The job '%s' requires parameters before it can be triggered.
 
@@ -134,7 +136,8 @@ Example:
 
 Once the user provides the parameters, call this tool again with the parameters included.`,
 				args.JobName,
-				fmt.Sprintf("%s", paramList))
+				strings.Join(paramList, "\n"),
+			)
 
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
