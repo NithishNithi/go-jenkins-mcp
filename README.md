@@ -342,7 +342,7 @@ MIT License - see LICENSE file for details
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/NithishNithi/go-jenkins-mcp/issues)
-- **Documentation**: [Full specification](.kiro/specs/jenkins-mcp-server/)
+- **Documentation**: [Full specification](./DOCUMENTATION.md)
 - **MCP Protocol**: [Model Context Protocol](https://modelcontextprotocol.io/)
 
 ## Acknowledgments
