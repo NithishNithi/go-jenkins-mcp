@@ -207,7 +207,7 @@ Add the Jenkins MCP Server to your Claude Desktop configuration:
         "-e", "JENKINS_URL=https://jenkins.example.com",
         "-e", "JENKINS_USERNAME=your-username",
         "-e", "JENKINS_API_TOKEN=your-api-token",
-        "ghcr.io/nithishnithi/jenkins-mcp-server:v1.0.1"
+        "ghcr.io/nithishnithi/jenkins-mcp-server:v1.0.2"
       ]
     }
   }

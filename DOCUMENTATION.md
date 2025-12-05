@@ -65,7 +65,7 @@ docker run -i \
   -e JENKINS_URL= \
   -e JENKINS_USERNAME= \
   -e JENKINS_API_TOKEN= \
-  ghcr.io/nithishnithi/jenkins-mcp-server:v1.0.1
+  ghcr.io/nithishnithi/jenkins-mcp-server:v1.0.2
 ```
 
 **Configure for Claude Desktop:**
@@ -79,7 +79,7 @@ docker run -i \
         "-e", "JENKINS_URL=",
         "-e", "JENKINS_USERNAME=",
         "-e", "JENKINS_API_TOKEN=",
-        "ghcr.io/nithishnithi/jenkins-mcp-server:v1.0.1"
+        "ghcr.io/nithishnithi/jenkins-mcp-server:v1.0.2"
       ]
     }
   }
