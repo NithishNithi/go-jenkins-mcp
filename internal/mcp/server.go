@@ -67,7 +67,9 @@ func (s *Server) Start(ctx context.Context) error {
 // registerTools registers all Jenkins tools with the MCP server
 func (s *Server) registerTools() error {
 	toolPrefix := s.config.ToolPrefix
-
+	if toolPrefix != "" && toolPrefix[len(toolPrefix)-1] != '_' {
+		toolPrefix += "_"
+	}
 
 	// ───────────────────────────────
 	// JOBS
