@@ -21,6 +21,7 @@ type Config struct {
 	CACertPath    string
 	MaxRetries    int
 	RetryBackoff  time.Duration
+	ToolPrefix    string
 }
 
 // Validate validates the configuration values
@@ -151,6 +152,7 @@ func Load() (*Config, error) {
 		CACertPath:    v.GetString("jenkins.tls.caCert"),
 		MaxRetries:    v.GetInt("jenkins.retry.maxAttempts"),
 		RetryBackoff:  v.GetDuration("jenkins.retry.backoff"),
+		ToolPrefix:    v.GetString("jenkins.tool.prefix"),
 	}
 
 	// Validate configuration
@@ -185,6 +187,7 @@ func bindEnvVariables(v *viper.Viper) {
 		"JENKINS_CA_CERT":         "jenkins.tls.caCert",
 		"JENKINS_MAX_RETRIES":     "jenkins.retry.maxAttempts",
 		"JENKINS_RETRY_BACKOFF":   "jenkins.retry.backoff",
+		"JENKINS_TOOL_PREFIX":     "jenkins.tool.prefix",
 	}
 
 	for envVar, configKey := range envBindings {

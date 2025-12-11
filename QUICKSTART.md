@@ -5,7 +5,7 @@ Get the Jenkins MCP Server up and running in 5 minutes.
 ## Prerequisites
 
 - Access to a Jenkins instance
-- Jenkins API token (recommended) or username/password
+- Jenkins API token
 
 ## Step 1: Get Jenkins API Token
 
@@ -25,8 +25,11 @@ docker run -i \
   -e JENKINS_URL=https://your-jenkins.com \
   -e JENKINS_USERNAME=your-username \
   -e JENKINS_API_TOKEN=your-token-here \
+  -e JENKINS_TOOL_PREFIX=prod \
   ghcr.io/nithishnithi/jenkins-mcp-server:latest
 ```
+
+**Note:** `JENKINS_TOOL_PREFIX` is optional but useful when running multiple Jenkins MCP servers (e.g., `prod_jenkins_list_jobs`, `staging_jenkins_list_jobs`).
 
 ### Option B: Docker Compose
 
@@ -40,6 +43,7 @@ cat > .env << EOF
 JENKINS_URL=https://your-jenkins.com
 JENKINS_USERNAME=your-username
 JENKINS_API_TOKEN=your-token-here
+JENKINS_TOOL_PREFIX=prod
 EOF
 
 # Start the server
@@ -56,7 +60,7 @@ docker-compose logs -f
    - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
    - Linux: `~/.config/Claude/claude_desktop_config.json`
 
-2. **Add the Jenkins MCP Server with Docker:**
+2. **Add the Jenkins MCP Server:**
 
 ```json
 {
@@ -65,10 +69,11 @@ docker-compose logs -f
       "command": "docker",
       "args": [
         "run", "-i", "--rm",
-        "-e", "JENKINS_URL=",
-        "-e", "JENKINS_USERNAME=",
-        "-e", "JENKINS_API_TOKEN=",
-        "jenkins-mcp-server:latest"
+        "-e", "JENKINS_URL=https://your-jenkins.com",
+        "-e", "JENKINS_USERNAME=your-username",
+        "-e", "JENKINS_API_TOKEN=your-api-token",
+        "-e", "JENKINS_TOOL_PREFIX=prod",
+        "ghcr.io/nithishnithi/jenkins-mcp-server:latest"
       ]
     }
   }
@@ -81,15 +86,15 @@ docker-compose logs -f
 
 Ask Claude:
 - "List all Jenkins jobs"
-- "What's the status of the latest build for [job-name]?"
-- "Trigger a build for [job-name]"
-- "Show me the build log for build #42 of [job-name]"
+- "What's the status of the latest build for main-pipeline?"
+- "Trigger a build for deployment-job"
+- "Show me the build log for build #42"
 
-## Common Issues
+## Troubleshooting
 
 ### "Connection refused"
-- Check that `JENKINS_URL` is correct and accessible
-- Verify Jenkins is running
+- Verify `JENKINS_URL` is correct and accessible
+- Check that Jenkins is running
 
 ### "Authentication failed"
 - Verify your API token is correct
@@ -97,63 +102,32 @@ Ask Claude:
 - Check user permissions in Jenkins
 
 ### "Certificate verification failed"
-For development with self-signed certificates:
+For self-signed certificates (development only):
 ```bash
-export JENKINS_TLS_SKIP_VERIFY=true
+-e JENKINS_TLS_SKIP_VERIFY=true
 ```
-**Warning:** Don't use this in production!
+**Warning:** Don't use in production!
 
 ### Claude doesn't show Jenkins tools
-- Verify the binary path is correct
+- Verify configuration is correct
 - Check environment variables are set
 - Restart Claude Desktop
-- Check Claude Desktop logs
-
-## Next Steps
-
-- **Full Documentation**: See [README.md](README.md)
-- **Complete Documentation Index**: See [DOCUMENTATION.md](DOCUMENTATION.md)
+- Ensure binary has execute permissions
 
 ## Available Tools
 
-Once configured, you can use these Jenkins operations through Claude:
+**Jobs:** list_jobs, get_job, trigger_build  
+**Builds:** get_build, get_build_log, get_running_builds, stop_build  
+**Artifacts:** list_artifacts, get_artifact  
+**Queue:** get_queue, get_queue_item, cancel_queue_item  
+**Views:** list_views, get_view, create_view  
+**Server:** server_health, list_nodes, get_pipeline_script
 
-**Jobs:**
-- `jenkins_list_jobs` - List all jobs
-- `jenkins_get_job` - Get job details
-- `jenkins_trigger_build` - Trigger a build
+## Next Steps
 
-**Builds:**
-- `jenkins_get_build` - Get build status
-- `jenkins_get_build_log` - Get build logs
-- `jenkins_get_running_builds` - Get all running builds
-- `jenkins_stop_build` - Stop a running build
-
-**Artifacts:**
-- `jenkins_list_artifacts` - List build artifacts
-- `jenkins_get_artifact` - Download artifacts
-
-**Queue:**
-- `jenkins_get_queue` - View build queue
-- `jenkins_get_queue_item` - Get queue item details
-- `jenkins_cancel_queue_item` - Cancel queued build
-
-**Views:**
-- `jenkins_list_views` - List all views
-- `jenkins_get_view` - Get view details
-- `jenkins_create_view` - Create new view
-
-**Server & Nodes:**
-- `jenkins_server_health` - Check server health
-- `jenkins_list_nodes` - List all nodes
-- `jenkins_get_pipeline_script` - Get pipeline script
-
-## Support
-
+- **Full Documentation**: [README.md](README.md)
 - **Issues**: [GitHub Issues](https://github.com/NithishNithi/go-jenkins-mcp/issues)
-- **Documentation**: [Full README](README.md)
-- **Documentation Index**: [DOCUMENTATION.md](DOCUMENTATION.md)
 
 ---
 
-**That's it!** You're now ready to use Jenkins through Claude or any other MCP client.
+**That's it!** You're now ready to use Jenkins through Claude.

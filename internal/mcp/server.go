@@ -66,22 +66,24 @@ func (s *Server) Start(ctx context.Context) error {
 
 // registerTools registers all Jenkins tools with the MCP server
 func (s *Server) registerTools() error {
+	toolPrefix := s.config.ToolPrefix
+
 
 	// ───────────────────────────────
 	// JOBS
 	// ───────────────────────────────
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_get_job",
+		Name:        toolPrefix + "jenkins_get_job",
 		Description: "Get detailed information about a specific Jenkins job including configuration, parameters, and recent build history.",
 	}, s.handleGetJob)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_list_jobs",
+		Name:        toolPrefix + "jenkins_list_jobs",
 		Description: "List all accessible Jenkins jobs. Optionally filter by folder path.",
 	}, s.handleListJobs)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_trigger_build",
+		Name:        toolPrefix + "jenkins_trigger_build",
 		Description: "Trigger a new build for a Jenkins job. Supports parameterized builds.",
 	}, s.handleTriggerBuild)
 
@@ -89,22 +91,22 @@ func (s *Server) registerTools() error {
 	// BUILDS
 	// ───────────────────────────────
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_get_build",
+		Name:        toolPrefix + "jenkins_get_build",
 		Description: "Get status and details of a specific build. If buildNumber is omitted, returns the latest build.",
 	}, s.handleGetBuild)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_get_build_log",
+		Name:        toolPrefix + "jenkins_get_build_log",
 		Description: "Retrieve the console output (log) for a specific build. Supports optional size limits for large logs.",
 	}, s.handleGetBuildLog)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_get_running_builds",
+		Name:        toolPrefix + "jenkins_get_running_builds",
 		Description: "Get all currently running builds across all Jenkins jobs.",
 	}, s.handleGetRunningBuilds)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_stop_build",
+		Name:        toolPrefix + "jenkins_stop_build",
 		Description: "Stop a running build. The build status will be updated to ABORTED.",
 	}, s.handleStopBuild)
 
@@ -112,12 +114,12 @@ func (s *Server) registerTools() error {
 	// ARTIFACTS
 	// ───────────────────────────────
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_get_artifact",
+		Name:        toolPrefix + "jenkins_get_artifact",
 		Description: "Download a specific artifact from a build. Returns the artifact content.",
 	}, s.handleGetArtifact)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_list_artifacts",
+		Name:        toolPrefix + "jenkins_list_artifacts",
 		Description: "List all artifacts produced by a specific build.",
 	}, s.handleListArtifacts)
 
@@ -125,17 +127,17 @@ func (s *Server) registerTools() error {
 	// QUEUE
 	// ───────────────────────────────
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_cancel_queue_item",
+		Name:        toolPrefix + "jenkins_cancel_queue_item",
 		Description: "Cancel a queued build before it starts.",
 	}, s.handleCancelQueueItem)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_get_queue",
+		Name:        toolPrefix + "jenkins_get_queue",
 		Description: "Get the current Jenkins build queue showing all pending builds.",
 	}, s.handleGetQueue)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_get_queue_item",
+		Name:        toolPrefix + "jenkins_get_queue_item",
 		Description: "Get details about a specific queue item by ID.",
 	}, s.handleGetQueueItem)
 
@@ -143,17 +145,17 @@ func (s *Server) registerTools() error {
 	// VIEWS
 	// ───────────────────────────────
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_create_view",
+		Name:        toolPrefix + "jenkins_create_view",
 		Description: "Create a new Jenkins view.",
 	}, s.handleCreateView)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_get_view",
+		Name:        toolPrefix + "jenkins_get_view",
 		Description: "Get jobs in a specific Jenkins view.",
 	}, s.handleGetView)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_list_views",
+		Name:        toolPrefix + "jenkins_list_views",
 		Description: "List all Jenkins views.",
 	}, s.handleListViews)
 
@@ -161,17 +163,17 @@ func (s *Server) registerTools() error {
 	// SERVER
 	// ───────────────────────────────
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_server_health",
+		Name:        toolPrefix + "jenkins_server_health",
 		Description: "Get the health status of the Jenkins server.",
 	}, s.handleServerHealthStatus)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_list_nodes",
+		Name:        toolPrefix + "jenkins_list_nodes",
 		Description: "List all Jenkins nodes in the network.",
 	}, s.handleGetNodes)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "jenkins_get_pipeline_script",
+		Name:        toolPrefix + "jenkins_get_pipeline_script",
 		Description: "Retrieve the Jenkinsfile (pipeline script) of a pipeline job.",
 	}, s.handleGetPipelineScript)
 
