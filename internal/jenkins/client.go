@@ -287,6 +287,21 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 	return resp, nil
 }
 
+func (c *Client) doJSON(ctx context.Context, method, path string, body io.Reader, out interface{}) error {
+	resp, err := c.doRequest(ctx, method, path, body)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("jenkins API error %d: %s", resp.StatusCode, string(b))
+	}
+
+	return json.NewDecoder(resp.Body).Decode(out)
+}
+
 // Placeholder implementations for interface methods
 // These will be implemented in subsequent tasks
 
@@ -1027,52 +1042,82 @@ func (c *Client) GetQueue(ctx context.Context) ([]QueueItem, error) {
 	return queueItems, nil
 }
 
+
 func (c *Client) GetRunningBuilds(ctx context.Context) ([]RunningBuild, error) {
-	// Get the list of all jobs first
-	jobs, err := c.ListJobs(ctx, "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to list jobs: %w", err)
-	}
 
-	runningBuilds := []RunningBuild{}
+    // Optimized Jenkins API query (MUCH smaller, faster, reliable)
+    const executorAPI = "/computer/api/json?tree=computer[displayName,executors[idle,currentExecutable[fullDisplayName,url,number,estimatedDuration,timestamp]]]"
 
-	// For each job, check if it has a running build
-	for _, job := range jobs {
-		// Get job details to check the last build
-		jobDetails, err := c.GetJob(ctx, job.Name)
-		if err != nil {
-			// Skip jobs we can't access
-			continue
-		}
+    // Call Jenkins
+    resp, err := c.doRequest(ctx, http.MethodGet, executorAPI, nil)
+    if err != nil {
+        return nil, fmt.Errorf("failed to fetch executors: %w", err)
+    }
+    defer resp.Body.Close()
 
-		// Check if there's a last build
-		if jobDetails.LastBuild == nil {
-			continue
-		}
+    if resp.StatusCode >= 300 {
+        body, _ := io.ReadAll(resp.Body)
+        return nil, fmt.Errorf("jenkins API error %d: %s", resp.StatusCode, string(body))
+    }
 
-		// Get the build details
-		build, err := c.GetBuild(ctx, job.Name, jobDetails.LastBuild.Number)
-		if err != nil {
-			// Skip builds we can't access
-			continue
-		}
+    // Structs for JSON decoding
+    type CurrentExecutable struct {
+        FullDisplayName   string `json:"fullDisplayName"`
+        URL               string `json:"url"`
+        Number            int64  `json:"number"`
+        EstimatedDuration int64  `json:"estimatedDuration"`
+        Timestamp         int64  `json:"timestamp"`
+    }
 
-		// If the build is currently running, add it to the list
-		if build.Building {
-			runningBuild := RunningBuild{
-				JobName:           job.Name,
-				BuildNumber:       build.Number,
-				URL:               build.URL,
-				Timestamp:         build.Timestamp,
-				EstimatedDuration: build.EstimatedDuration,
-				Executor:          build.Executor,
-			}
-			runningBuilds = append(runningBuilds, runningBuild)
-		}
-	}
+    type Executor struct {
+        Idle              bool               `json:"idle"`
+        CurrentExecutable *CurrentExecutable `json:"currentExecutable"`
+    }
 
-	return runningBuilds, nil
+    type Computer struct {
+        DisplayName string     `json:"displayName"`
+        Executors   []Executor `json:"executors"`
+    }
+
+    type ComputerResponse struct {
+        Computers []Computer `json:"computer"`
+    }
+
+    // Decode JSON response
+    var data ComputerResponse
+    if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+        return nil, fmt.Errorf("failed to decode executor response: %w", err)
+    }
+
+    running := []RunningBuild{}
+
+    // Extract all actively running builds
+    for _, comp := range data.Computers {
+        for _, ex := range comp.Executors {
+            if ex.Idle || ex.CurrentExecutable == nil {
+                continue
+            }
+
+            ce := ex.CurrentExecutable
+
+            running = append(running, RunningBuild{
+                JobName:           ce.FullDisplayName,
+                BuildNumber:       int(ce.Number), // convert int64 → int
+                URL:               ce.URL,
+                EstimatedDuration: ce.EstimatedDuration,
+                Timestamp:         ce.Timestamp,
+                Executor:          comp.DisplayName,
+            })
+        }
+    }
+
+    return running, nil
 }
+
+
+
+
+
 
 // GetQueueItem retrieves details about a specific queue item
 func (c *Client) GetQueueItem(ctx context.Context, queueID int) (*QueueItem, error) {
