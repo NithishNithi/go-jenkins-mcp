@@ -92,6 +92,48 @@ func TestNewClient(t *testing.T) {
 	}
 }
 
+func TestJobPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		jobName  string
+		expected string
+	}{
+		{
+			name:     "simple job",
+			jobName:  "example",
+			expected: "/job/example",
+		},
+		{
+			name:     "nested folder job",
+			jobName:  "folder/subjob",
+			expected: "/job/folder/job/subjob",
+		},
+		{
+			name:     "already formatted job path",
+			jobName:  "job/folder/job/subjob",
+			expected: "/job/folder/job/subjob",
+		},
+		{
+			name:     "trims slashes",
+			jobName:  "/folder/subjob/",
+			expected: "/job/folder/job/subjob",
+		},
+		{
+			name:     "escapes path segments",
+			jobName:  "folder with space/subjob",
+			expected: "/job/folder%20with%20space/job/subjob",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := jobPath(tt.jobName); got != tt.expected {
+				t.Errorf("jobPath(%q) = %q, want %q", tt.jobName, got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestClientImplementsInterface(t *testing.T) {
 	// This test verifies that Client implements JenkinsClient interface
 	cfg := &config.Config{
@@ -464,7 +506,7 @@ func TestGetArtifactValidation(t *testing.T) {
 
 // Helper function to check if a string contains a substring
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || 
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
 		(len(s) > 0 && len(substr) > 0 && findSubstring(s, substr)))
 }
 

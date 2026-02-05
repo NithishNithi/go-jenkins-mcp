@@ -20,6 +20,33 @@ import (
 	_ "github.com/leanovate/gopter" // Will be used for property-based testing
 )
 
+func normalizeJobName(jobName string) string {
+	jobName = strings.TrimSpace(jobName)
+	jobName = strings.Trim(jobName, "/")
+	if jobName == "" {
+		return ""
+	}
+
+	jobName = strings.TrimPrefix(jobName, "job/")
+	jobName = strings.ReplaceAll(jobName, "/job/", "/")
+
+	return jobName
+}
+
+func jobPath(jobName string) string {
+	normalized := normalizeJobName(jobName)
+	if normalized == "" {
+		return "/job/"
+	}
+
+	parts := strings.Split(normalized, "/")
+	for i, part := range parts {
+		parts[i] = url.PathEscape(part)
+	}
+
+	return "/job/" + strings.Join(parts, "/job/")
+}
+
 // JenkinsClient defines the interface for interacting with Jenkins API
 type JenkinsClient interface {
 	// Job operations
@@ -309,7 +336,7 @@ func (c *Client) ListJobs(ctx context.Context, folder string) ([]Job, error) {
 	// Build the API path
 	path := "/api/json"
 	if folder != "" {
-		path = "/job/" + folder + path
+		path = jobPath(folder) + path
 	}
 
 	// Add tree parameter to get specific job fields
@@ -362,7 +389,7 @@ func (c *Client) GetJob(ctx context.Context, jobName string) (*JobDetails, error
 	}
 
 	// Build the API path with detailed tree parameter
-	path := fmt.Sprintf("/job/%s/api/json", jobName)
+	path := fmt.Sprintf("%s/api/json", jobPath(jobName))
 	path += "?tree=name,url,description,buildable,inQueue,color,disabled,"
 	path += "lastBuild[number,url],"
 	path += "lastSuccessfulBuild[number,url],"
@@ -479,7 +506,7 @@ func (c *Client) TriggerBuild(ctx context.Context, jobName string, params map[st
 
 	if len(params) > 0 {
 		// Use buildWithParameters endpoint with query parameters
-		path = fmt.Sprintf("/job/%s/buildWithParameters", jobName)
+		path = fmt.Sprintf("%s/buildWithParameters", jobPath(jobName))
 
 		// Jenkins expects parameters as query parameters in the URL
 		queryParams := url.Values{}
@@ -489,7 +516,7 @@ func (c *Client) TriggerBuild(ctx context.Context, jobName string, params map[st
 		path = path + "?" + queryParams.Encode()
 	} else {
 		// Use simple build endpoint
-		path = fmt.Sprintf("/job/%s/build", jobName)
+		path = fmt.Sprintf("%s/build", jobPath(jobName))
 	}
 
 	// Make POST request
@@ -658,7 +685,7 @@ func (c *Client) GetBuild(ctx context.Context, jobName string, buildNumber int) 
 	}
 
 	// Build the API path with tree parameter to get specific build fields
-	path := fmt.Sprintf("/job/%s/%d/api/json", jobName, buildNumber)
+	path := fmt.Sprintf("%s/%d/api/json", jobPath(jobName), buildNumber)
 	path += "?tree=number,url,result,building,duration,timestamp,executor,estimatedDuration"
 
 	// Make GET request
@@ -700,7 +727,7 @@ func (c *Client) GetLatestBuild(ctx context.Context, jobName string) (*Build, er
 	}
 
 	// Build the API path to get the lastBuild information
-	path := fmt.Sprintf("/job/%s/api/json", jobName)
+	path := fmt.Sprintf("%s/api/json", jobPath(jobName))
 	path += "?tree=lastBuild[number,url,result,building,duration,timestamp,executor,estimatedDuration]"
 
 	// Make GET request
@@ -763,7 +790,7 @@ func (c *Client) StopBuild(ctx context.Context, jobName string, buildNumber int)
 	}
 
 	// Build the API path for stopping the build
-	path := fmt.Sprintf("/job/%s/%d/stop", jobName, buildNumber)
+	path := fmt.Sprintf("%s/%d/stop", jobPath(jobName), buildNumber)
 
 	// Make POST request to stop the build
 	resp, err := c.doRequest(ctx, http.MethodPost, path, nil)
@@ -825,7 +852,7 @@ func (c *Client) GetBuildLogWithLimit(ctx context.Context, jobName string, build
 	}
 
 	// Build the API path for console text
-	path := fmt.Sprintf("/job/%s/%d/consoleText", jobName, buildNumber)
+	path := fmt.Sprintf("%s/%d/consoleText", jobPath(jobName), buildNumber)
 
 	// Make GET request
 	resp, err := c.doRequest(ctx, http.MethodGet, path, nil)
@@ -875,7 +902,7 @@ func (c *Client) ListArtifacts(ctx context.Context, jobName string, buildNumber 
 	}
 
 	// Build the API path with artifacts tree parameter
-	path := fmt.Sprintf("/job/%s/%d/api/json", jobName, buildNumber)
+	path := fmt.Sprintf("%s/%d/api/json", jobPath(jobName), buildNumber)
 	path += "?tree=artifacts[fileName,relativePath,size]"
 
 	// Make GET request
@@ -931,7 +958,7 @@ func (c *Client) GetArtifact(ctx context.Context, jobName string, buildNumber in
 	}
 
 	// Build the API path for artifact download
-	path := fmt.Sprintf("/job/%s/%d/artifact/%s", jobName, buildNumber, artifactPath)
+	path := fmt.Sprintf("%s/%d/artifact/%s", jobPath(jobName), buildNumber, artifactPath)
 
 	// Make GET request
 	resp, err := c.doRequest(ctx, http.MethodGet, path, nil)
@@ -1042,82 +1069,76 @@ func (c *Client) GetQueue(ctx context.Context) ([]QueueItem, error) {
 	return queueItems, nil
 }
 
-
 func (c *Client) GetRunningBuilds(ctx context.Context) ([]RunningBuild, error) {
 
-    // Optimized Jenkins API query (MUCH smaller, faster, reliable)
-    const executorAPI = "/computer/api/json?tree=computer[displayName,executors[idle,currentExecutable[fullDisplayName,url,number,estimatedDuration,timestamp]]]"
+	// Optimized Jenkins API query (MUCH smaller, faster, reliable)
+	const executorAPI = "/computer/api/json?tree=computer[displayName,executors[idle,currentExecutable[fullDisplayName,url,number,estimatedDuration,timestamp]]]"
 
-    // Call Jenkins
-    resp, err := c.doRequest(ctx, http.MethodGet, executorAPI, nil)
-    if err != nil {
-        return nil, fmt.Errorf("failed to fetch executors: %w", err)
-    }
-    defer resp.Body.Close()
+	// Call Jenkins
+	resp, err := c.doRequest(ctx, http.MethodGet, executorAPI, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch executors: %w", err)
+	}
+	defer resp.Body.Close()
 
-    if resp.StatusCode >= 300 {
-        body, _ := io.ReadAll(resp.Body)
-        return nil, fmt.Errorf("jenkins API error %d: %s", resp.StatusCode, string(body))
-    }
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("jenkins API error %d: %s", resp.StatusCode, string(body))
+	}
 
-    // Structs for JSON decoding
-    type CurrentExecutable struct {
-        FullDisplayName   string `json:"fullDisplayName"`
-        URL               string `json:"url"`
-        Number            int64  `json:"number"`
-        EstimatedDuration int64  `json:"estimatedDuration"`
-        Timestamp         int64  `json:"timestamp"`
-    }
+	// Structs for JSON decoding
+	type CurrentExecutable struct {
+		FullDisplayName   string `json:"fullDisplayName"`
+		URL               string `json:"url"`
+		Number            int64  `json:"number"`
+		EstimatedDuration int64  `json:"estimatedDuration"`
+		Timestamp         int64  `json:"timestamp"`
+	}
 
-    type Executor struct {
-        Idle              bool               `json:"idle"`
-        CurrentExecutable *CurrentExecutable `json:"currentExecutable"`
-    }
+	type Executor struct {
+		Idle              bool               `json:"idle"`
+		CurrentExecutable *CurrentExecutable `json:"currentExecutable"`
+	}
 
-    type Computer struct {
-        DisplayName string     `json:"displayName"`
-        Executors   []Executor `json:"executors"`
-    }
+	type Computer struct {
+		DisplayName string     `json:"displayName"`
+		Executors   []Executor `json:"executors"`
+	}
 
-    type ComputerResponse struct {
-        Computers []Computer `json:"computer"`
-    }
+	type ComputerResponse struct {
+		Computers []Computer `json:"computer"`
+	}
 
-    // Decode JSON response
-    var data ComputerResponse
-    if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-        return nil, fmt.Errorf("failed to decode executor response: %w", err)
-    }
+	// Decode JSON response
+	var data ComputerResponse
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, fmt.Errorf("failed to decode executor response: %w", err)
+	}
 
-    running := []RunningBuild{}
+	running := []RunningBuild{}
 
-    // Extract all actively running builds
-    for _, comp := range data.Computers {
-        for _, ex := range comp.Executors {
-            if ex.Idle || ex.CurrentExecutable == nil {
-                continue
-            }
+	// Extract all actively running builds
+	for _, comp := range data.Computers {
+		for _, ex := range comp.Executors {
+			if ex.Idle || ex.CurrentExecutable == nil {
+				continue
+			}
 
-            ce := ex.CurrentExecutable
+			ce := ex.CurrentExecutable
 
-            running = append(running, RunningBuild{
-                JobName:           ce.FullDisplayName,
-                BuildNumber:       int(ce.Number), // convert int64 → int
-                URL:               ce.URL,
-                EstimatedDuration: ce.EstimatedDuration,
-                Timestamp:         ce.Timestamp,
-                Executor:          comp.DisplayName,
-            })
-        }
-    }
+			running = append(running, RunningBuild{
+				JobName:           ce.FullDisplayName,
+				BuildNumber:       int(ce.Number), // convert int64 → int
+				URL:               ce.URL,
+				EstimatedDuration: ce.EstimatedDuration,
+				Timestamp:         ce.Timestamp,
+				Executor:          comp.DisplayName,
+			})
+		}
+	}
 
-    return running, nil
+	return running, nil
 }
-
-
-
-
-
 
 // GetQueueItem retrieves details about a specific queue item
 func (c *Client) GetQueueItem(ctx context.Context, queueID int) (*QueueItem, error) {
@@ -1429,7 +1450,7 @@ func (c *Client) GetNodes(ctx context.Context) ([]Node, error) {
 	return result.Computer, nil
 }
 func (c *Client) GetPipelineScript(ctx context.Context, job string) (string, error) {
-	path := fmt.Sprintf("/job/%s/config.xml", job)
+	path := fmt.Sprintf("%s/config.xml", jobPath(job))
 
 	resp, err := c.doRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
